@@ -1,7 +1,5 @@
 # Research
 
----
-
 A working library of historical DOS specifications and references useful for implementing and studying **memory managers**, **DOS extenders**, and **DPMI hosts**.
 
 The documents under [`docs/dos/`](docs/dos/) cover the classic interfaces that 386+ DOS environments glue together: EMS/XMS memory services, VCPI and DPMI protected-mode entry, DMA virtualization (VDS), vendor memory-manager APIs, and related OpenDOS/DR-DOS protected-mode and multitasking material.
@@ -9,8 +7,6 @@ The documents under [`docs/dos/`](docs/dos/) cover the classic interfaces that 3
 These are archival copies of public-era specs and manuals (or faithful transcriptions). Prefer the PDF when both a PDF and text extract exist; the `.txt` / `.doc` copies are kept for grepping and diffing.
 
 ## Documents
-
----
 
 | Document | Description |
 | --- | --- |
@@ -33,8 +29,6 @@ These are archival copies of public-era specs and manuals (or faithful transcrip
 | [PC DOS 7 Technical Update](docs/dos/pc_dos7_technical_update.pdf) | IBM GG24-4459 PC DOS 7 programmer-oriented technical update, including Appendix E on DPMS and Appendix F on task-swapping. |
 
 ## Open-source projects
-
----
 
 Popular projects used in FreeDOS / SvarDOS and related communities. Links point at the primary source repository when one exists.
 

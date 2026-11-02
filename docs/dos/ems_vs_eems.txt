@@ -1,0 +1,1185 @@
+
+A Comparison of EMS 4.0 with EMS and EEMS 3.2
+
+Report by Stephen T. Satchell
+
+Revision B, September 17, 1987
+
+____________________________________________________________
+
+Copyright 1987 Satchell Evaluations.
+
+Permission is granted to all persons to freely duplicate and
+distribute this information with the following restrictions: (1)
+This document is transferred unmofigirf, with all notices in
+place. (2) No fee may be directly or indirectly charged for this
+information EXCEPT by (a) on-line services and bulletin board systems
+that charge for access so long as no surcharge applied to this
+file, and (b) by professional computer societies (ACM, IEEE
+Computer and the like) which regularly publish a journal or
+magazine. User groups and for-profit groups are specifically
+prohibited from selling media (paper or machine readable)
+containing this information.
+
+Permission for other uses may be requested from Satchell
+Evaluations, 16 Searing Avenue, Morristown NJ 07960. The author
+asks that people using any exerpt from this report contact him to
+insure the information is accurate to the author's best knowledge
+before publication.
+
+This document is the result of the author's own initiative, and
+is not work for hire.
+
+This work is derived from three published documents: (1) _The
+Lotus/Intel/Microsoft Expanded Memory Specification_ Version 3.20
+September 1985, (2) _Enhanced Expanded Memory Specification
+Version 3.20 June 1986, and (3) _Lotus/Intel/Microsoft Expanded
+Memory Specification_ Version 4.0 August 1987 (final printed
+version) The prior revision of this document was based on a
+laser printed manuscript.
+
+Another document mentioned here is the _Generic Accelerator Card
+Driver (GACD) Specification_ available from AST Research Inc.
+
+Intel is a trademark of Intel Corporation.
+Lotus is a trademark of Lotus Development Corporation.
+Microsoft is a trademark of Microsoft Corporation.
+
+____________________________________________________________
+
+Preface to Revision B:
+----------------------
+
+The original version of this document was based on the EMS 4.0
+specification handed out to the press at the August 19th
+announcement. Since then, Intel informed the author that this
+copy of the specification was preliminary and contained several
+errors that are corrected in the final printed version of the
+specification. Unfortunately, both documents carry the same
+version, part number and date. The ONLY difference is that the
+correct document is in the 5x8.5 format, while the document
+containing errors is 8.5x11.
+
+The original of this document was in two pieces: the comparision
+and a separate error/problem sheet. These two pieces are now
+combined into the single document as the elimination of the typos
+"correct" the problems found. Programmers are urged to consider
+that some of the driver implementers are human, and might read
+things into the specification that simply are not true. IN SHORT,
+WATCH OUT FOR BOUNDARY VIOLATIONS BY ENHANCED MEMORY MANAGERS.
+
+The author understands the difference between physical and
+logical pages, but in some parts of the prior version of this
+document the author got mixed up and swapped terms. This has been
+corrected. A physical page is a 16 KB location in the 1 MB
+address space of the 80x86 system, while a logical page is a
+block of RAM that can be mapped into a physical page. 'Nuff said.
+Sorry.
+
+The section on limits has been expanded considerably, based on
+documents from both Intel and AST. Other sections have been
+expanded as well, including minor corrections.
+
+Buried in the back of the specification, this statement appears:
+``To support generic accelerator cards, the support of Function
+34, as defined by AST, is encouraged.'' Unfortunately, all copies
+of the AST EEMS specification in my posession do not have any
+concrete description of this function, and Intel didn't include
+this information. Interested persons should contact AST and ask
+for a copy of the _Generic Accelerator Card Driver (GACD)
+Specification_. I will attempt to obtain a copy of this and
+include the information in a future revision of this document.
+
+____________________________________________________________
+
+
+INTRODUCTION
+------------
+
+On August 19, 1987, the new version of the Expanded Memory
+Specification (EMS) was announced by Lotus, Intel and Microsoft.
+This new version of the specification includes many features of
+the Enhanced Expanded Memory Specification (EEMS) originally
+developed by AST Reserach, Quadram and Ashton-Tate, although the
+three original sponsoring companies elected not to make the new
+specification upward compatible with EEMS. AST Research indicated
+in a separate statement that they would endorse EMS 4.0 without
+reservation.
+
+An important aside unrelated to this document is that Lotus
+Development Corporation has stated that pure software
+implementations of EMS 4.0 (those that do not use either
+dedicated memory hardware, PS/2 T-RAM or 80386 page mapping) will
+not be supported by Lotus products.
+
+This paper attempts to compare EMS 4.0 with both EMS 3.2 and EEMS
+3.2 specifications, by looking at each function. This is not
+intended to republish the specification -- interested parties are
+urged to contact Intel Corporation at (800) 538-3373 and ask for
+the "EMS 4.0 Developers Kit".
+
+The functions will be listed by hexidemical code, not by abstract
+function number. This is of more use to developers since they
+tend to think of the functions based on the value loaded into the
+registers, not by an index. Where subfunctions are defined (such
+as in function 4Eh "Page Map Functions" the function and
+subfunction will be separated by a slash. Within the body of the
+text, I will indicate whether the EMS 4.0 function is upwardly
+compatible with the older specifications.
+
+This document can also serve as a quick reference to those
+programmers already familiar with the EMS 4.0 specification and
+wanting a synopsis of the calling sequences for EMS operations.
+Programmers and interested parties wishing to fully understand
+the implications of each function is urged to examine the Base
+Document, _Lotus/Intel/Microsoft Expanded Memory Specification_
+Version 4.0, available from Intel by calling (800) 538-3373 and
+asking for the EMS 4.0 Developers Kit.
+
+
+MAJOR DIFFERENCES
+-----------------
+
+One significant change is that the total amount of memory managed
+by an Expanded Memory Manager (EMM) has grown from 8 megabytes to
+"full-tilt-boogy" 32 megabytes (to quote a recent _InfoWorld_
+article) -- 512 pages to 2048 pages of 16 KB each. In this
+author's opinion, there is no reason a programmer should assume
+this is the absolute limit. THAT is dictated by the use of 16 bit
+signed values for page numbers, capping capacity at 32768 pages
+of 16 KB each -- 512 megabytes of RAM. Programs can interrogate
+the EMM for the actual amount available and tailor operations
+accordingly. Note the developers do not indicate whether the word
+values used for pages are signed or unsigned. If the values are
+intended to be unsigned, then 65535 (with page value FFFFh
+treated as a special value) can exist, or 16 KB short of one
+gigabyte of RAM in a single system.
+
+
+DEFINITION OF LIMITS
+--------------------
+
+This is the worst part of the specification, since in no single
+place does the spec writers completely list the assumptions about
+limits, let alone future directions concerning those limits. Here
+is the author's ideas of the limits that drive the specification.
+Where possible the author has erred toward the more inclusive.
+
+                     Maximum RAM: 32 MB today, future 512 MB
+ Minimum number of logical pages: 4 (64 KB).
+ Maximum number of logical pages: 2048 today, future 32768.
+Minimum number of physical pages: 4 (64 KB).
+Maximum number of physical pages: 64 (full 1 MB space).
+       Minimum number of handles: 64 (includes OS handle 00h).
+       Maximum number of handles: 255 (includes OS handle 00h).
+     Minimum # EMS 3.2 page maps: one per handle
+     Maximum # EMS 3.2 page maps: unbounded
+   Maximum size of mem reg array: 254 bytes
+
+The "page maps" refer to contexts saved by functions 47h and 48h,
+Save Page Map and Restore Page Map.
+
+The number of logical pages in a particular system can be
+obtained using function 42h; this also has the useful side effect
+of telling you the number of free pages as well.
+
+The number of physical pages in a particular system can be
+obtained by using function 58h/01h and the particular mapping by
+using function 58h/00h. Should this function fail, you can assume
+you have four pages starting at the segment returned by function
+41h.
+
+The maximum number of handles that can be defined is 255. For
+those implementations that do not do any mapping in conventional
+memory, you can have 255 user handles. For those implementations
+that map into conventional memory, you can have 254 user handles
+and the special operating system handle. Note that handle values
+can range from 01h to FFh in the first case, or from 00h to FEh
+in the second.
+
+The maximum number of handles in a particular system can be
+obtained by using function 54h/02h. Should this function fail,
+you can make no assumptions about the number of handles
+available.
+
+
+GOTCHAS
+-------
+
+This section is what was left from the errata file in the prior
+version. If you prefer to work with possibly incorrect
+implementations of the EMS specification, pay particular heed to
+the comments here, as they can save you untold grief when you
+(and other programs in a system) stretch an expanded memory
+manager to the limit and beyond. The author makes NO claim that
+he has found all of these; if you discover another, please let
+the author know so he can add your new gotcha to the next
+revision (and you will receive credit for your contribution).
+
+46h -- Get Version [7]
+===
+
+There exists some confusion whether the version returned is the
+specification supported or the version number of the driver.
+Programmers are united in stating this should be the
+specification version supported, while at least one vendor
+(Intel) is known to use this function to return the software
+version of the particular implementation.
+
+The wording of the description indicates that the vendor revision
+is intended, and thus is useless to programmers wishing to be
+able to adapt to the environment they encounter. The author
+considers this a severe weakness in the specification. Either a
+different function should be provided for returning vendor
+specific version information or other means for obtaining the
+current implementation version should be provided and documented
+by each vendor.
+
+
+Function 4Dh, Get All Handles [14]
+============
+
+BX is specified to have a maximum value of 255. A non-conforming
+implementation could indeed allow 256 handles, assuming that
+since handles can range in value from 00h to FFh that the full
+range should be implemented.
+
+Consider allowing for 256 entries in the array instead of the 255
+entries as indicated in the example for this function.
+
+There is also a problem with identifying the difference between a
+raw handle and a standard handle. Currently there is no facility
+to make this determination. Obviously the program making the
+allocation needs to keep this straight, but another program
+happening onto a raw handle (such as a debug program) has no way
+of really knowing. Unfortunate oversight, especially since the
+specification makes no comment about whether the page count is
+EMS pages, raw pages, or a funny number.
+
+
+Function 54h Subfunction 00h, Get Handle Directory [21/0]
+============
+
+Consider allow for 256 names in the handle directory array
+instead of 255 should a particular implementation violate the
+limit set up in the specification.
+
+
+Function 56h Subfunctions 00h/01h, Alter Page Map and Call [23]
+============
+
+The function description indicates that register and flag
+contents (except for AX) are preserved going to the called
+function. This means that BX, CX, DI, and ES are available for
+passing values to the called function. Although not explicit, the
+flags and all registers EXCEPT AX are unmodified when returning
+from the remotely called function.
+
+Since many compilers use AX to return integer values from
+functions, there needs to be examples showing how to preserve the
+value when making EMS calls. This may indeed require direct
+compiler support...something that will not happen overnight.
+
+The specification does not indicate whether the EMM handle passed
+in DX must describe pages contained by both calling and called
+routines, or whether there can be two different handles involved
+as well.
+
+MISSING
+=======
+
+A function to return the current logical->physical mapping in a
+vendor-independent manner. This would be exceedingly useful in
+debuggers.
+
+
+FUNCTIONS DEFINED IN EMS 3.2 SPECIFICATION
+------------------------------------------
+
+40h -- Get Status [1]
+===
+
+On call:        AH = 40h
+On return:      AH = error status
+Error Status:   00h, 80h, 81h, 84h
+
+Upward and downward compatible with both EMS and EEMS 3.2.
+
+
+41h -- Get Page Frame Segment Address [2]
+===
+
+On call:        AH = 41h
+On return:      AH = error status
+                BX = page frame segment address
+Error Status:   00h, 80h, 81h, 84h
+
+Upward and downward compatible with both EMS and EEMS 3.2.
+
+
+42h -- Get Unallocated Page Count [3]
+===
+
+On call:        AH = 42h
+On return:      AH = error status
+                BX = number of unallocated pages
+                DX = number of total pages
+Error Status:   00h, 80h, 81h, 84h
+
+Upward and downward compatible with both EMS and EEMS 3.2. Note
+that EMS and EEMS 3.2 had no mechanism to return the maximum
+number of handles that can be allocated by programs. This is
+handled by the EMS 4.0 new function 54h/02h.
+
+
+43h -- Allocate Pages [4]
+===
+
+On call:        AH = 43h
+                BX = number of 16 KB pages requested (zero OK)
+On return:      AH = error status
+                DX = handle
+Error Status:   00h, 80h, 81h, 84h, 85h, 87h, 88h
+
+Upward compatible with both EMS and EEMS 3.2; EMS and EEMS 3.2 do
+not allow the allocation of zero pages (returns error status
+89h). EMS 4.0 does allow zero pages to be requested for a handle,
+allocating pages later using function 51h, Reallocate Pages.
+
+
+44h -- Map/Unmap Handle Page [5]
+===
+
+On call:        AH = 44h
+                AL = physical page to be mapped
+                BX = logical page to be mapped (-1 to unmap)
+                DX = handle
+On return:      AH = error status
+Error Status:   00h, 80h, 81h, 83h, 84h, 8Ah, 8Bh
+
+Upward compatible with both EMS and EEMS 3.2; EMS and EEMS 3.2 do
+not support unmap (logical page FFFFh) capability. Also, E/EMS
+3.2 specified there were precisely four physical pages; EMS 4.0
+uses the subfunctions of function 58h to return the permitted
+number of physical pages.
+
+This incorporates the functionality of function 69h ("function
+42") of EEMS.
+
+
+45h -- Deallocate Pages [6]
+===
+
+On call:        AH = 45h
+                DX = handle
+On return:      AH = error status
+Error Status:   00h, 80h, 81h, 83h, 84h, 86h
+
+Upward and downward compatible with both EMS and EEMS 3.2.
+
+
+46h -- Get Version [7]
+===
+
+On call:        AH = 46h
+On return:      AH = error status
+                AL = version number
+Error Status:   00h, 80h, 81h, 84h
+
+Upward and downward compatible with both EMS and EEMS 3.2.
+
+See the GOTCHA section for a discussion about a problem with this
+function. It appears that the intended use for this function is
+to return the version of the vendor implementation of the
+expanded memory manager instead of the specification version. In
+short, this function is useless to the vendor-independant
+programmer as defined.
+
+
+47h -- Save Page Map [8]
+===
+
+On call:        AH = 47h
+                DX = caller's EMM handle (NOT current EMM handle)
+On return:      AH = error status
+Error Status:   00h, 80h, 81h, 83h, 84h, 8Ch, 8Dh
+
+Upward and downward compatible with both EMS and EEMS 3.2.
+
+This only saves the context saved in EMS 3.2 specification; if a
+driver, interrupt routine or TSR needs to do more, functions 4Eh
+(Page Map functions) or 4Fh (Partial Page Map functions) should
+be used.
+
+The specification is silent about the number of save contexts to
+provide. AST recommends in their Rampage AT manual one save context
+for each handle plus one per possible interrupt (5 + ).
+In the LIMITS section of the document the minimum number of save
+contexts is the number of handles.
+
+
+48h -- Restore Page Map [9]
+===
+
+On call:       AH = 48h
+               DX = caller's EMM handle (NOT current EMM handle)
+On return:     AH = error status
+Error Status:  00h, 80h, 81h, 83h, 84h, 8Eh
+
+Upward and downward compatible with both EMS and EEMS 3.2.
+
+This only restores the context saved in EMS 3.2 specification; if
+a driver, interrupt routine or TSR needs to do more, functions
+4Eh (Page Map functions) or 4Fh (Partial Page Map functions)
+should be used.
+
+
+49h -- (reserved) [10]
+===
+
+This function formerly returned the page mapping register I/O
+port array. Use of this function is discouraged, and in EMS 4.0
+may conflict with the use of the new functions (4Fh through 5Dh).
+
+
+4Ah -- (reserved) [11]
+===
+
+This function formerly returned the page translation array. Use
+of this function is discouraged, and in EMS 4.0 may conflict with
+the use of the new functions (4Fh through 5Dh).
+
+It is odd that no function presents in a vendor-independent
+manner the current mapping of logical pages to physical pages.
+This would be exceedingly handy in a debugging environment (such
+as Periscope or CodeView) in trying to track down bugs in
+programs using expanded memory.
+
+
+4Bh -- Get Handle Count [12]
+===
+
+On call:       AH = 4Bh
+On return:     AH = error status
+               BX = handle count
+Error Status:  00h, 80h, 81h, 84h
+
+Upward and downward compatible with EMS and EEMS 3.2.
+
+
+4Ch -- Get Handle Pages [13]
+===
+
+On call:       AH = 4Ch
+               DX = handle
+On return:     AH = status
+               BX = pages allocated to handle
+Error Status:  00h, 80h, 81h, 83h, 84h
+
+This function is upward compatible with EMS and EEMS 3.2. It is
+interesting to note how foolish the spec writers were, in that
+the E/EMS 3.2 spec writers state that "[the contents of BX] never
+exceeds 512 because the EMM allows, at most, 512 pages of
+expanded memory." EMS 4.0 makes a lie of this statement, yet
+falls into the same trap by stating that the contents of BX will
+never exceed 2048. DON'T BELIEVE IT. This author suspects that
+future versions of the spec will make the EMS 4.0 specification
+lie, too.
+
+The programmer should make no assumptions about the order handles
+appear in the array.
+
+Paranoid programmers (like the author) should compare the number
+returned in BX with the maximum number of pages returned by
+function 42h register DX, total number of EMM pages. This should
+be an UNSIGNED comparison, just in case the spec writers decide
+to use 16 bit unsigned numbers (for a maximum space of one
+gigabyte) instead of signed numbers (for a maximum space of 512
+megabytes). Unsigned comparisons will work properly in either
+case, and the author recommends the use of unsigned comparisons.
+
+
+4Dh -- Get All Handle Pages [14]
+===
+
+On call:       AH = 4Dh
+               DI = offset to 1020 byte array
+               ES = segment selector for 1020 byte array
+On return:     AH = error status
+               BX = number of active handles (1-255)
+Error Status:  00h, 80h, 81h, 84h
+
+NOT COMPATIBLE with EMS or EEMS 3.2, since the new special OS
+handle 0000h is returned as part of the array. Unless benign use
+of this information is used (such as displaying the handle and
+count of pages associated with the handle) code should be changed
+to only work with handles between 01h and FFh and to specifically
+ignore handle 00h.
+
+The array consists of an array of 255 elements. The first word of
+each element is the handle number, the second word contains the
+number of pages allocated.
+
+PROBLEM: There are two types of handles, "standard" and "raw".
+The specification does not talk about how this function works
+when both raw and standard handles exist in a given system. There
+currently is NO way to differentiate between a standard handle
+and a raw handle in EMS 4.0 that the author can find. Ooops. This
+is particularly painful in debuggers when the hardware and EMM
+support raw pages whose size differs from the 16 KB standard page
+size.
+
+
+4Eh -- Page Map Functions [15]
+===
+
+This group of four sub-functions are provided for context
+switching required by operating environments and systems. These
+functions are upward and downward compatible with both EMS and
+EEMS 3.2; in addition, these functions now include the
+functionality of EEMS function 6Ah ("function 43") involving all
+pages.
+
+The size and contents of the mag register (map reg) array will
+vary from system to system based on hardware vendor, software
+vendor, number of boards and the capacity of each board in the
+system. Note the array size can be determined by function
+4Eh/03h.
+
+
+4Eh/00h -- Get Page Map [15/0]
+
+On call:       AH = 4Eh
+               AL = 00h
+               DI = offset to target array
+               ES = segment selector for target array
+On return:     AH = error status
+Error Status:  00h, 80h, 81h, 84h, 8Fh
+
+
+4Eh/01h -- Set Page Map [15/1]
+
+On call:       AH = 4Eh
+               AL = 01h
+               SI = offset to source array
+               DS = segment selector for source array
+On return:     AH = error status
+Error Status:  00h, 80h, 81h, 84h, 8Fh, A3h
+
+
+4Eh/02h -- Get and Set Page Map [15/2]
+
+On call:       AH = 4Eh
+               AL = 02h
+               SI = offset to source array (new context)
+               DI = offset to target array (old context)
+               DS = segment selector for source array
+               ES = segment selector for target array
+On return:     AH = error status
+Error Status:  00h, 80h, 81h, 84h, 8Fh, A3h
+
+
+4Eh/03h -- Get Size of Page Map Save Array [15/3]
+
+On call:       AH = 4Eh
+               AL = 03h
+On return:     AH = error status
+               AL = size in bytes of array
+Error Status:  00h, 80h, 81h, 84h, 8Fh
+
+
+FUNCTIONS NEW TO EMS 4.0
+------------------------
+
+4Fh -- Partial Page Map Functions [16]
+===
+
+This group of four sub-functions are provided for context
+switching required by interrupt routines, operating environments
+and systems. This set of functions provides extended
+functionality over the EEMS function 6Ah ("function 43")
+involving subsets of pages. In EEMS, a subset of pages could be
+specified by starting position and number of pages; in this
+function a list of pages is specified, which need not be
+contiguous.
+
+Interrupt routines can use this function in place of functions
+47h and 48h, especially if the interrupt routine wants to use
+more than the standard four physical pages.
+
+The page map is a structure of words. The first word indicate the
+number of pages specified. The remaining words contain the
+segment selector (NOT the physical page number) for each page.
+Translation from physical page number to segment selectors can be
+performed using function 58h/00h, Get Mappable Physical Address
+Array.
+
+The size and contents of the mag register (map reg) array will
+vary from system to system based on hardware vendor, software
+vendor, number of boards and the capacity of each board in the
+system. Note the array size can be determined by function
+4Fh/02h.
+
+NOTE: there is no equivelant to 4Eh/02h, Get And Set, in this
+group of functions. From the point of view of system maintenance,
+the author would have preferred that subfunction 02h be reserved
+and the get-size command be subfunction 03h. Unfortunatly the die
+is cast.
+
+
+4Fh/00h -- Get Partial Page Map [16/0]
+
+On call:       AH = 4Fh
+               AL = 00h
+               SI = offset of page specification array
+               DI = offset of target map reg array
+               DS = segment selector of page spec array
+               ES = segment selector of target map reg array
+On return:     AH = error status
+Error Status:  00h, 80h, 81h, 84h, 8Bh, 8Fh, A3h
+
+
+4Fh/01h -- Set Partial Page Map
+
+On call:       AH = 4Fh
+               AL = 01h
+               SI = offset of source map reg array
+               DS = segment selector of source map reg array
+On return:     AH = error status
+Error Status:  00h, 80h, 81h, 84h, 8Fh, A3h
+
+
+4Fh/02h -- Get Size of Partial Page Map Save Array
+
+On call:       AH = 4Fh
+               BX = number of pages in page spec array
+On return:     AH = error status
+               AL = size in bytes of mag reg array
+Error Status:  00h, 80h, 81h, 84h, 8Bh, 8Fh
+
+
+50h -- Map/Unmap Multiple Pages [17/0][17/1]
+===
+
+On call:       AH = 50h
+               AL = 00h (by physical page) or 01h (by seg#)
+               CX = number of mapping word pairs in array
+               DX = handle
+               SI = offset of source map array
+               DS = segment selector of source map array
+On return:     AH = error status
+Error Status:  00h, 80h, 81h, 83h, 84h, 8Ah, 8Bh, 8F
+
+New function permits multiple logical-to-physical assignments to
+be made in a single call.
+
+The source map array is an array of word pairs. The first word of
+a pair contains the logical page to map (FFFFh if the physical
+page is to be totally unmapped) and the second word of a pair
+contains the physical page number (subfunction 00h) or the
+segment selector (subfunction 01h) of the physical page in which
+the logical page shall be mapped.
+
+A map of available physical pages (by physical page number and
+segment selectors) can be obtained using function 58h/00h, Get
+Mappable Physical Address Array.
+
+
+51h -- Reallocate pages [18]
+===
+
+On call:       AH = 51h
+               BX = number of pages desired at return
+               DX = handle
+On return:     AH = error status
+               BX = number of pages now associated with handle
+Error Status:  00h, 80h, 81h, 83h, 84h, 87h, 88h
+
+New function which permits the number of pages associated with a
+handle to be decreased or increased.
+
+
+52h -- Handle Attribute Functions [19]
+===
+
+Something new added to the EMS specification is the ability to
+mark a handle and pages assoicated with a handle as non-volatile
+-- preserved across a warm boot of the system. The specification
+indicates that few if any EMS systems will support such a feature
+since the EMS hardware must insure the data remains valid
+throughout the warm boot sequence.
+
+Currently the only attribute supported is non-volatile handles
+and pages, indicate by the least significant bit.
+
+
+52h/00h -- Get Handle Attribute [19/0]
+
+On call:       AH = 52h
+               AL = 00h
+               DX = handle
+On return:     AH = error status
+               AL = handle attribute
+Error Status:  00h, 80h, 81h, 83h, 84h, 8Fh, 91h
+
+
+52h/01h -- Set Handle Attribute [19/1]
+
+On call:       AH = 52h
+               AL = 01h
+               BL = new attribute value
+               DX = handle
+On return:     AH = error status
+Error Status:  00h, 80h, 81h, 83h, 84h, 8Fh, 90h, 91h
+
+
+52h/02h -- Get Handle Attribute Capability [19/2]
+
+On call:       AH = 52h
+               AL = 02h
+On return:     AH = error status
+               AL = attribute capability
+Error Status:  00h, 80h, 81h, 83h, 84h, 8Fh
+
+
+53h -- Handle Name Functions [20]
+===
+
+EMS handles may have names associated with them. Each name can be
+any eight characters. Functions 53h and 54h provide a way of
+setting and interrogating the names associated with a particular
+handle. Function 53h manipulates names by number.
+
+A name of eight nulls is special, and indicates a handle has no
+name. Note, by the way, that nulls have no special significance,
+and they can appear in the middle of the name. In short, the
+handle name is 64 bits of binary information so far as the
+expanded memory manager is concerned. The author recommends that
+when defining a handle name that the selected name be padded on
+the right with spaces, ASCII graphic characters be used, and that
+control codes and hi-bit-set characters be avoided to make a
+debugger's life easier.
+
+
+53h/00h -- Get Handle Name [20/0]
+
+On call:       AH = 53h
+               AL = 00h
+               DX = handle
+               DI = offset to eight byte target
+               ES = segment selector of eight byte target
+On return:     AH = error status
+Error Status:  00h, 80h, 81h, 83h, 84h, 8Fh
+
+
+53h/01h -- Set Handle Name [20/1]
+
+On call:       AH = 53h
+               AL = 01h
+               DX = handle
+               SI = offset to eight byte source
+               DS = segment selector to eight byte source
+On return:     AH = error status
+Error Status:  00h, 80h, 81h, 83h, 84h, 8Fh, A1h
+
+
+54h -- Handle Directory Functions [21]
+===
+
+Function 54h manipulates handles by name.
+
+
+54h/00h -- Get Handle Directory [21/0]
+
+On call:       AH = 54h
+               AL = 00h
+               DI = offset to 2550 byte target array
+               ES = segment selector to 2550 byte target array
+On return:     AH = error status
+               AL = number of active handles
+Error Status:  00h, 80h, 81h, 84h, 8Fh
+
+The name array consists of 10 byte entries; each entry has a word
+containing the handle number, followed by the eight byte (64 bit)
+name.
+
+
+54h/01h -- Search for Named Handle [21/1]
+
+On call:       AH = 54h
+               AL = 01h
+               SI = offset to 8 byte array with name
+               DS = segment selector to 8 byte array
+On return:     AH = error status
+               DX = handle [number]
+Error Status:  00h, 80h, 81h, 84h, 8Fh, A0h, A1h
+
+
+54h/02h -- Get Total Handles [21/2]
+
+On call:       AH = 54h
+               AL = 02h
+On return:     AH = error status
+               BX = maximum number of handles
+Error Status:  00h, 80h, 81h, 84h, 8Fh
+
+This is NOT the current number of handles defined, but the
+maximum number of handles that can be supported in the current
+environment.
+
+
+55h -- Alter Page Map and Jump (cross page branch) [22]
+===
+
+On call:       AH = 55h
+               AL = 00h (by physical page) or 01h (by seg#)
+               DX = handle
+               SI = offset to jump target and mapping table
+               DS = segment selector for target/map table
+On return:     AH = error status
+Error Status:  00h, 80h, 81h, 83h, 84h, 8Ah, 8Bh, 8Fh
+
+Flags and all registers except AX are preserved across the jump.
+
+One of the problems plaguing programmers in paged systems is
+being able to place code in paged memory. This function allows
+for an unstructured branch from code in one bank to code in
+potentially another bank without defining a bank manager in
+conventional memory. Thus several applications do not have to
+duplicate code.
+
+Note that code should follow the call to handle any error
+conditions that may arise. The programmer SHOULD NOT ASSUME the
+jump will always work. Graceful crashes are always preferable to
+sloppy ones...
+
+
+56h -- Alter Page Map and Call (cross page call) [23/0][23/1]
+===
+
+On call:       AH = 56h
+               AL = 00h (by physical page) or 01h (by seg#)
+               DX = handle
+               SI = offset to jump target and mapping table
+               DS = segment selector for target/map table
+On return:     AH = error status
+Error Status:  00h, 80h, 81h, 83h, 84h, 8Ah, 8Bh, 8Fh
+
+Flags and all registers except AX are preserved to the called
+routine. On return, flags and all registers except AX are
+preserved; AL is set to zero and AX is undefined.
+
+One common calling convention is useless with this function:
+indicating an error by incrementing the return address before
+issuing a RET instruction. Obviously the return address is within
+the expanded memory manager, and if you increment the address
+"the results are undefined" to quote an ANSI language standards
+document. "Sloppy crash" is probably more accurate.
+
+PROBLEM: AX is not preserved on the return leg of the call. This
+is a particular pain to C and PASCAL programmers since the most
+common way to return integer values is in AX. The amount of stack
+space required by the function call cannot be determined at
+compile time. It CAN be determined at run time, using function
+56h/02h, so at least the parameter frame can be located.
+Unfortunately this plays hob with using BP for both parameters
+and local storage. The best thing is to define a series of
+assembler wrapper routines that (1) copies the parameter stack to
+the new function and (2) preserves AX on return. This means
+redesigning functions to pass structures and the size of
+structures instead of individual parameters, a performance
+problem.
+
+
+56h/02h -- Get Page Map Stack Space Size [23/2]
+
+On call:       AH = 56h
+               AL = 02h
+On return:     AH = error status
+               BX = number of bytes of stack used per call
+Error Status:  00h, 80h, 81h, 84h, 8Fh
+
+The author assumes the value returned in BX is even, to match the
+requirements of the 80x86 architecture. Implementers should check
+to be sure they follow this important guideline.
+
+
+57h -- Memory Manipulation [24]
+===
+
+The request block is a structure with the following format:
+
+    doubleword: region length in bytes
+          byte: 0=source in conventional; 1=source in expanded
+          word: source handle
+          word: source offset in page or selector
+          word: source logical page (exp.) or selector (conv.)
+          byte: 0=target in conventional; 1=target in expanded
+          word: target handle
+          word: target offset in page or selector
+          word: target logical page (exp.) or selector (conv.)
+
+Expanded memory allocated to a handle is considered to be a
+linear array, starting from logical page 0 and progressing
+through logical page 1, 2, ... n, n+1, ... up to the last logical
+page in the handle.
+
+
+57h/00h -- Move Memory Region [24/0]
+
+On call:       AH = 57h
+               AL = 00h
+               SI = offset to request block
+               DS = segment selector to request block
+On return:     AH = error status
+Error Status:  00h, 80h, 81h, 83h, 84h, 8Ah, 8Fh, 92h, 93h,
+               94h, 95h, 96h, 98h, A2h
+
+Moves data between two memory areas. Includes moves between paged
+and non-pages areas, or between two different paged areas.
+
+
+57h/01h -- Exchange Memory Region [24/1]
+
+On call:       AH = 57h
+               AL = 01h
+               SI = offset to request block
+               DS = segment selector to request block
+On return:     AH = error status
+Error Status:  00h, 80h, 81h, 83h, 84h, 8Ah, 8Fh, 93h,
+               94h, 95h, 96h, 97h, 98h, A2h
+
+Exchanges data between two memory areas. Includes exchanges
+between paged and non-pages areas, or between two different paged
+areas.
+
+
+58h -- Mappable Physical Address Array [25]
+===
+
+These functions let you obtain a complete map of the way physical
+memory is laid out in a vendor independent manner. This is a
+functional equivalent of EEMS function 68h ("function 41"). EEMS
+function 60h ("function 33") is a subset call of 68h.
+
+
+58h/00h -- Get Array [25/0]
+
+On call:       AH = 58h
+               AL = 00h
+               DI = offset to target array
+               ES = segment selector to target array
+On return:     AH = error status
+               CX = entries in target array
+Error Status:  00h, 80h, 81h, 84h, 8Fh
+
+The information returned is in an array composed of word pairs.
+The first word is the physical page's segment selector, the
+second word the physical page number. Note that values are not
+necessarily returned in a particular order, either
+ascending/decending segment selector values or as
+ascending/decending physical page number.
+
+For compatibility with earlier EMS specifications, physical page
+zero contains the segment selector value returned by function
+41h, and physical pages 1, 2 and 3 return segment selector values
+that corrospond to the physical 16 KB blocks immediately
+following physical page zero.
+
+
+58h/01h -- Get Array Entries [25/1]
+
+On call:       AH = 58h
+               AL = 01h
+On return:     AH = error status
+               CX = number of entries returned by 58h/00h
+Error Status:  00h, 80h, 81h, 84h, 8Fh
+
+Multiply CX by 4 for the byte count.
+
+
+59h -- Hardware Information [26]
+===
+
+These functions return information specific to a given hardware
+implementation and to use of raw pages as opposed to standard
+pages. The intent is that only operating system code ever need
+use these functions.
+
+
+59h/00h -- Get EMS Hardware Info [26/0]
+
+On call:       AH = 59h
+               AL = 00h
+               DI = offset of target array (10 bytes)
+               ES = segment selector of target array
+On return:     AH = error status
+Error Status:  00h, 80h, 81h, 84h, 8Fh, A4h
+
+The target array has the following format:
+
+     word: raw page size in paragraphs (multiples of 16 bytes)
+     word: number of alternate register sets
+     word: size of page maps (function 4Eh [15])
+     word: number of alternate registers sets for DMA
+     word: DMA operation -- see full specification
+
+
+59h/01h -- Get Unallocated Raw Page Count [26/1]
+
+On call:       AH = 59h
+               AL = 01h
+On return:     AH = error status
+               BX = unallocated raw pages
+               DX = total raw pages
+Error Status:  00h, 80h, 81h, 84h, 8Fh
+
+
+5Ah -- Allocate Raw Pages [27]
+===
+
+On call:       AH = 5Ah
+               BX = raw page count
+On return:     AH = error status
+               DX = handle
+Error Status:  00h, 80h, 81h, 84h, 85h, 87h, 88h
+
+It is intended this call be used only by operating systems.
+
+
+5Bh -- Alternate Map Register Set [28]
+===
+
+Some boards support multiple sets of mapping registers, some for
+the specific purpose of performing DMA. These functions access
+the special features if they are available.
+
+It is intended these functions be used only by an operating
+system.
+
+This set of functions performs the same functions at EEMS
+function 6Ah subfunctions 04h and 05h ("function 43").
+
+In the interests of brevity, the calls are not detailed here. For
+more information, please refer to the base document.
+
+
+5Bh/00h -- Get Alternate Map Register Set [28/0]
+5Bh/01h -- Set Alternate Map Register Set [28/1]
+5Bh/02h -- Get Alternate Map Save Array Size [28/2]
+5Bh/03h -- Allocate Alternate Map Register Set [28/3]
+5Bh/04h -- Deallocate Alternate Map Register Set [28/4]
+5Bh/05h -- Allocate DMA Register Set [28/5]
+5Bh/06h -- Enable DMA on Alternate Map Register Set [28/6]
+5Bh/07h -- Disable DMA on Alternate Map Register Set [28/7]
+5Bh/08h -- Deallocate DMA Register Set [28/8]
+
+
+5Ch -- Prepare EMS Hardware for Warm Boot [29]
+===
+
+On call:       AH = 5Ch
+On return:     AH = error status
+Error Status:  00h, 80h, 81h, 84h
+
+Provided for those hardware implementations that must be set up
+to preserve contents across a warm boot.
+
+
+5Dh -- Operating System / Environment function control [30]
+===
+
+Security feature for operating systems and operating environment
+use. For brevity, the calls are not detailed here.
+
+5Dh/00h -- Enable OS/E Function Set [30/0]
+5Dh/01h -- Disable OS/E Function Set [30/1]
+5Dh/02h -- Return OS/E Access Key [30/2]
+
+
+61h -- Generic Accelerator Card Support [34]
+===
+
+For more information, contact AST Research for a copy of the
+_Generic Accelerator Card Driver (GACD) Specification_.
+
+ERROR RETURNS
+-------------
+
+00h -- Successful Completion
+
+80h -- Software Error
+
+81h -- Hardware Error
+
+82h -- EMM busy (dropped in E/EMS 3.2)
+
+83h -- Unknown EMM handle.
+
+84h -- Unknown function code in AH.
+
+85h -- All EMM handles are in use.
+
+86h -- Page save/restore context error.
+
+87h -- More pages requested than exist.
+
+88h -- Not enough free pages to satisfy allocation request.
+
+89h -- Zero page allocate request (dropped in EMS 4.0)
+
+8Ah -- Logical page out of range
+
+8Bh -- Physical page out of range
+
+8Ch -- No room in the map context save area
+
+8Dh -- Page context already saved
+
+8Eh -- No page context to restore
+
+8Fh -- Unknown sub-function
+
+90h -- Attribute type undefined (new)
+
+91h -- Warm boot data save not implemented (new)
+
+92h -- Move overlaps memory (new)
+
+93h -- Move/exchange larger than allocated region (new)
+
+94h -- Conventional/expanded regions overlap (new)
+
+95h -- Logical page offset outside of logical page (new)
+
+96h -- Region larger than 1 MB. (new)
+
+97h -- exchange source/destination overlap (new)
+
+98h -- source/destination undefined or not supported (new)
+
+99h -- (no status assigned)
+
+9Ah -- Alt. Map Reg. Sets supported, specified set is not (new)
+
+9Bh -- All alternate map & DMA registers sets allocated (new)
+
+9Ch -- Alternate Map & DMA register sets not supported (new)
+
+9Dh -- Alt Map Reg or DMA set no defined, allocated or is
+currently defined set (new)
+
+9Eh -- Dedicated DMA channels not supported (new)
+
+9Fh -- Dedicated DMA channels supported; specifed channel is not
+(new)
+
+A0h -- Named handle could not be found (new)
+
+A1h -- Handle Name already exists (new)
+
+A2h -- Move/exchange wraps around 1 MB boundry (new)
+
+A3h -- Data structure contains corrupted data (new)
+
+A4h -- Access denied (new)

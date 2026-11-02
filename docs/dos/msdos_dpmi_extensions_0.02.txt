@@ -1,0 +1,1159 @@
+                        MS-DOS API EXTENSIONS FOR DPMI HOSTS
+
+                              Version Pre-Release 0.02
+                                  October 31, 1990
+
+
+
+                                 TABLE OF CONTENTS
+
+
+            1. Introduction............................................1
+
+            2. Detecting the Presence of MS-DOS Extensions.............2
+
+            3. API Entry Point Functions...............................3
+                3.1 Get MS-DOS Extension Version.......................4
+                3.2 Get Selector to Base of LDT........................5
+
+            4. Notes for Microsoft Windows Program Writers.............6
+
+            6. DOS and BIOS Calls......................................8
+
+            7. DOS State on Entry into Protected Mode.................10
+
+            8. Supported DOS Calls....................................11
+                8.1 DOS Calls That Are Not Supported..................12
+                    8.1.1 Unsupported Interrupts......................12
+                    8.1.2 Unsupported Interrupt 21h DOS Functions.....12
+                8.2 Calls That Behave Differently in Protected Mode...13
+                    8.2.1 Functions 25h and 35h -- Set/Get Interrupt
+                    Vector............................................13
+                    8.2.2 Function 31h -- Terminate and Stay Resident.13
+                    8.2.3 Function 32h -- Get Current Country Data....13
+                    8.2.4 Functions 3Fh and 40h -- Read/Write File or
+                    Device............................................13
+                    8.2.5 Function 44h, Subfunctions 02h, 03h, 04h,
+                    and 05h...........................................14
+                    8.2.6 Function 44h, Subfunction 0Ch...............14
+                    8.2.7 Functions 48h, 49h and 4Ah..................14
+                    8.2.8 Function 4Bh -- Load and Execute Program....14
+                    8.2.9 Function 4Ch -- Terminate Process with
+                    Return Code.......................................15
+                    8.2.10 Function 65h -- Get Extended Country
+                    Information.......................................15
+
+            9. Supported BIOS Calls...................................16
+                9.1 Interrupt 10h -- Video............................17
+                    9.1.1 Register Based Functions (supported):.......17
+                    9.1.2 Function 10h -- Set Palette Registers.......17
+                    9.1.3 Function 13h -- Write String................17
+                    9.1.4 Functions that are not Fully Supported......17
+                9.2 Interrupt 11h -- Equipment Determination..........18
+                9.3 Interrupt 12h -- Memory Size Determination........19
+                9.4 Interrupt 13h -- Diskette / Fixed Disk Interface..20
+                9.5 Interrupt 14h -- Asynchronous Communications......21
+                9.6 Interrupt 15h -- System Services..................22
+                    9.6.1 Register Based Functions (supported):.......22
+                    9.6.2 Function C0h -- Return System Configuration
+                    Parameters........................................22
+                    9.6.3 Function C1h -- Pointing Device Interface...22
+                    9.6.4 Functions that are Not Supported:...........22
+                9.7 Interrupt 16h -- Keyboard.........................23
+                9.8 Interrupt 17h -- Printer..........................24
+                9.9 Interrupt 1Ah -- System-Timer and Real-Time Clock.25
+                    9.9.1 Register Based Functions (supported):.......25
+                    9.9.2 Function 06h -- Set Real-Time Clock Alarm...25
+
+            10. Mouse Driver Interface................................26
+                10.1 Mouse Calls that Are Supported...................26
+                    10.1.1 Register Based Calls.......................26
+                    10.1.2 Function 09h -- Set Pointer Shape..........26
+                    10.1.3 Function 0Ch -- Set User-Defined Mouse
+                    Event Handler.....................................27
+                    10.1.4 Functions 16h and 17h -- Save/Restore Mouse
+                    Driver State......................................27
+                10.2 Mouse Calls that Are Not Supported...............27
+
+            11. NETBIOS...............................................28
+
+            12. Interrupts 23h and 24h................................29
+
+
+
+[Footer: October 31, 1990 MS-DOS DPMI Extension Preliminary Documentation]
+
+
+
+[Page 1]
+
+
+
+                                  1. INTRODUCTION
+
+
+            While the DOS Protected Mode Interface (DPMI) specification
+            does not support DOS calls from protected-mode programs,
+            extenders from many companies, including enhanced mode
+            Windows 3.00, do support Int 21h and other standard DOS and
+            BIOS interrupts commonly used in DOS extended programs.
+
+            This document defines an interface that allows the "MS-DOS"
+            extensions to be detected, and provides guidelines on
+            deviations of behavior from DOS calls made in real mode.
+
+
+
+[Page 2]
+
+
+
+                   2. DETECTING THE PRESENCE OF MS-DOS EXTENSIONS
+
+
+            The MS-DOS extensions are supported by all versions of
+            Enhanced mode Windows. Windows version 3.00 does not support
+            the Int 2Fh API detection mechanism or API entry point, but
+            does support all DOS and BIOS calls documented in this text.
+            The correct code sequence for detecting the presence of the
+            MS-DOS extensions is as follows:
+
+                 MS_DOS_Name_String db "MS-DOS", 0
+
+                 ;
+                 ;       Note:  This assumes that the program has
+                 ;       already called the DPMI real to protected
+                 ;       mode switch entry point and is now running
+                 ;       in protected mode
+                 ;
+                 Test_For_MS_DOS_Ext_Code:
+                         mov     ax, 168Ah
+                         mov     (e)si, OFFSET MS_DOS_Name_String
+                         int     2Fh
+                         cmp     al, 8Ah
+                         jne     Have_MS_DOS_Extensions
+
+                 ;
+                 ;       Check for presence of Enhanced Windows 3.00
+                 ;
+                         mov     ax, 1600h
+                         int     2Fh
+                         test    al, 7Fh
+                         jnz     Have_MS_DOS_Extensions_But_No_Call_Back
+
+                         (MS-DOS extensions are not present)
+
+            If the first Int 2Fh succeeds then ES:(E)DI will point to an
+            API entry point that can be called by the program perform
+            functions described in the next section. If the first Int
+            2Fh fails, but the program is running under Enhanced mode
+            Windows 3.00 then the MS-DOS extensions are supported, but
+            it is not possible to call the API entry point since it was
+            not supported in Windows 3.00.
+
+
+
+[Page 3]
+
+
+
+                            3. API ENTRY POINT FUNCTIONS
+
+
+            The MS-DOS extensions provide only two new services for
+            protected mode programs. These are a get version function
+            and a function that returns a selector that points to the
+            base of the current program's LDT.
+
+            To call the API entry point, programs must execute a far
+            call to the address returned in ES:(E)DI from the function
+            described on page (?).
+
+
+
+[Page 4]
+
+
+
+             3.1 Get MS-DOS Extension Version
+
+
+            This function returns the version of MS-DOS extensions
+            supported by the DPMI host. Note that the value returned is
+            _not_ the version of DOS that the host is running on, it is
+            the version of DPMI MS-DOS extensions that are supported by
+            the host.
+
+            To Call
+
+                 AX = 0000h
+
+            Returns
+
+                 Carry flag is clear
+                 AH = Major MS-DOS extension version number
+                 AL = Minor MS-DOS extension version number
+
+
+
+[Page 5]
+
+
+
+             3.2 Get Selector to Base of LDT
+
+
+            Note that the DPMI host has the option of either failing
+            this call, or to return a read-only descriptor. If the host
+            returns a writeable LDT base descriptor then system security
+            can be compromised, but performance of some programs (most
+            notably the Windows kernel) can improve dramatically. This
+            allows programs to avoid ring transitions when examining or
+            modifying LDT selectors. Note that even read-only access to
+            the LDT reduces overhead a great deal in some circumstances.
+            This would reduce the number of ring transitions for a get
+            descriptor/set descriptor calls from two to one.
+
+            To Call
+
+                 AX = 0100h
+
+            Returns
+
+                 If function was successful:
+                 Carry flag is clear
+                 AX = Selector which points to base of current LDT
+
+                 If function was not successful:
+                 Carry flag is set
+
+            Programmer's Notes
+
+                 o    If this function succeeds, the caller must examine
+                      the access rights of the decriptor using a verw
+                      instruction to determine if the descriptor is
+                      writeable or is read-only.
+                 o    The selector returned by this function may be a
+                      GDT selector or an LDT selector. Programs should
+                      not assume that this selector exists in a
+                      perticular descriptor table.
+                 o    At some point, the host may choose to move the LDT
+                      in linear memory. The host will e responsible for
+                      updating the descriptor for this selector. For
+                      this reason, all programs, including 32-bit flat
+                      model programs, should always access the LDT
+                      through this selector only. Never attempt to
+                      access the memory at a particular linear address.
+
+
+
+[Page 6]
+
+
+
+                   6. NOTES FOR MICROSOFT WINDOWS PROGRAM WRITERS
+
+
+            While both Standard and Enhanced mode Windows support DPMI
+            0.9 with the MS-DOS extensions, Windows programs should
+            _not_ call any DPMI functions other than the following
+            translation services:
+
+                 AX = 0300h -- Simulate Real Mode Interrupt
+                 AX = 0301h -- Call Real Mode Procedure With Far Return
+                      Frame
+                 AX = 0302h -- Call Real Mode Procedure With Iret Frame
+                 AX = 0303h -- Allocate Real Mode Call-Back Address
+                 AX = 0304h -- Free Real Mode Call-Back Address
+
+            No other DPMI services, including the state save and raw
+            mode switch translation services, should be called Windows
+            programs and DLLs. The Windows kernel uses DPMI to allocate
+            memory, manipulate descriptors, and lock pages. All Windows
+            programs should call the appropriate kernel functions to
+            perform these operations. The following are hints for
+            Windows programmers on ways to avoid calling DPMI:
+
+            Windows programs should call the GetWinFlags function to
+                 determine if they are running in protected mode instead
+                 of using the DPMI Get Version call.
+
+            Windows applications and DLLs should use the function calls
+                 supplied by the Windows kernel to manipulate selectors
+                 instead of using DPMI services. These services are
+                 intended to be used by non-Windows applications that
+                 are running in protected mode.
+
+[The last sentence is crossed out (think MS Word/WinWord revision marks) in
+ this version of the document, suggesting that it was present in a previous
+ version but has later been deleted. - MS]
+
+            Windows applications should not use these DPMI DOS Memory
+                 Managment [sic] services. The Windows kernel has two
+                 functions named GlobalDOSAlloc and GlobalDOSFree that
+                 should be used by Windows applications and DLLs for
+                 allocating and freeing DOS addressable memory. Under
+                 normal circumstances the Windows kernel will have
+                 allocated all free DOS addressable memory and so the
+                 DPMI functions will always fail.
+
+            All requests to allocate, reallocate, free, or lock memory
+                 should be made through kernel functions.
+
+
+
+[Page 7]
+
+
+
+                                5. 32-BIT PROGRAMS
+
+
+            Many implementations of the MS-DOS extensions, including
+            Enhanced mode Windows, support 32-bit programs on 80386 and
+            80486 processors. In most cases, the APIs are exactly the
+            same as for 16-bit programs except that pointers are
+            48-bits. That is, they consist of a segment and a 32-bit
+            offset. DOS read and write calls (AH=3Fh and 40h) the count
+            register (ECX) is also extended to 32 bits. This allows
+            32-bit programs to perform DOS reads of greater than 64K
+            bytes.
+
+
+
+[Page 8]
+
+
+
+                               6. DOS AND BIOS CALLS
+
+
+            Programs running in protected mode under a DPMI host that
+            supports the MS-DOS extensions can make DOS and BIOS calls
+            just as they would when running in real mode (with some
+            minor exceptions). The only difference is that the code and
+            data of the program can reside in memory above one megabyte,
+            and all pointers use protected mode selectors instead of
+            real mode segments to point to data. As in real mode, DOS is
+            called by executing Int 21h.
+
+            When an Int 21h is executed in protected mode any data that
+            is required by that call will be copied to a buffer in real
+            mode and then the real mode DOS will be called with a
+            pointer to the copied data. The host is responsible for
+            copying data and translating pointers -- DPMI programs that
+            use the MS-DOS extensions need not worry about how
+
+            For example, lets look at a series of DOS calls to open and
+            read a file:
+
+                 ;
+                 ; Open the file with read-only access
+                 ;
+                 mov     ax, 3D00h
+                 mov     dx, OFFSET File_Name_String
+                 int     21h
+                 jc      Error
+
+                 ;
+                 ; Read the first 6000h bytes of the file
+                 ;
+                 mov     bx, ax
+                 mov     ah, 3Fh
+                 mov     cx, 6000h
+                 mov     dx, OFFSET Read_Buffer
+                 int     21h
+                 jc      Error
+
+                 ;
+                 ; Close the file
+                 ;
+                 mov     ah, 3Eh
+                 int     21h
+
+            The open file call takes an ASCIIZ pathname as a parameter.
+            Since the address passed to the protected mode Int 21h
+            handler is a selector:offset (DS contains a selector to
+            program's protected mode data segment), real mode DOS would
+            not be able to access the data. The protected mode DOS
+            translator copies the string into a real mode buffer and
+            then calls DOS in real mode with DS:DX pointing to the real
+            mode buffer. The values in other registers are not modified
+            so the call number in AX will not be changed. When real mode
+            DOS returns, the values returned in the flags and all
+            non-segment registers will be returned to the protected mode
+            program. In this case, the carry flag indicates an error and
+            the file handle will be returned in AX.
+
+
+
+[Page 9]
+
+
+
+            The second DOS call reads part of the file into a buffer.
+            Once again, since the buffer can not be accessed by real
+            mode DOS, the data must be copied through a buffer. The data
+            will be read into a real mode buffer and copied into the
+            protected mode memory. Since the real mode buffer is usually
+            smaller than 6000h bytes the translator will probably have
+            to break the read into several smaller pieces. However, all
+            the copying of data and multiple reads will be invisible to
+            the caller. The read will behave exactly as if the code were
+            being executed in real mode.
+
+            For the final call (close file), the protected mode Int 21h
+            hook just reflects the interrupt to real mode without
+            translating anything. Since the DOS close file command has
+            no pointer parameters, no translation is necessary.
+
+            The sample code above is 16-bit code and would work on an
+            80286 DPMI implementation. However, DPMI supports 32-bit
+            programs on 80386 and 80486 processors. The only difference
+            between 32-bit and 16-bit programs that pointers require a
+            32-bit offset in the extended register (EDX instead of DX)
+            and that DOS read and write calls take a 32-bit count in
+            ECX. The 32-bit equivalent of the sample code is provided
+            below.
+
+                 ;
+                 ; Open the file with read-only access
+                 ;
+                 mov     ax, 3D00h
+                 mov     edx, OFFSET File_Name_String
+                 int     21h
+                 jc      Error
+
+                 ;
+                 ; Read the first 6000h bytes of the file
+                 ;
+                 mov     bx, ax
+                 mov     ah, 3Fh
+                 mov     ecx, 6000h
+                 mov     edx, OFFSET Read_Buffer
+                 int     21h
+                 jc      Error
+
+                 ;
+                 ; Close the file
+                 ;
+                 mov     ah, 3Eh
+                 int     21h
+
+
+
+[Page 10]
+
+
+
+                     7. DOS STATE ON ENTRY INTO PROTECTED MODE
+
+
+            A host that supports the MS-DOS extensions to DPMI maintains
+            additional state information for each client program. When a
+            program enters protected mode on an extended DPMI host, the
+            state will be as described in the DPMI 0.9 specification
+            with the following additions:
+
+            1.   The protected mode DTA will be mapped to the real mode
+                 DTA when the program enters protected mode. If the DTA
+                 address has not been changed from the default at offset
+                 80h in the PSP, then the DTA selector will be the same
+                 as the PSP selector. Otherwise, a new descriptor will
+                 be allocated. Do not modify or free the DTA descriptor.
+                 Use DOS call 2Fh to obtain the address of the DTA.
+
+            2.   The DOS Ctrl+Break (Int 23h) and critical error (Int
+                 24h) interrupt handlers will be set to default handlers
+                 as described on page 29.
+
+
+
+[Page 11]
+
+
+
+                               8. SUPPORTED DOS CALLS
+
+
+            This section describes the differences between real mode DOS
+            and BIOS calls and those made in protected mode. Obviously,
+            pointers use protected mode selectors instead of real mode
+            segments. 32-bit programs must use 48-bit pointers and the
+            size parameters for some calls such as file reads and writes
+            will be 32-bit. For example DOS reads and writes use ECX for
+            the size parameter instead of CX for 32-bit programs. See
+            page 9 for an example of 32-bit DOS code.
+
+            All DOS calls that are not mentioned in this section should
+            work exactly as documented in _The MS-DOS Encyclopedia_. The
+            minimum assumed DOS version is 3.xx.
+
+
+
+[Page 12]
+
+
+
+             8.1 DOS Calls That Are Not Supported
+
+
+            The following DOS calls are not supported in protected mode.
+            They will fail if called.
+
+            8.1.1 Unsupported Interrupts
+
+
+                       INT            DESCRIPTION
+
+                       20h    Terminate Program
+                       25h    Absolute Disk Read
+                       26h    Absolute Disk Write
+                       27h    Terminate and Stay Resident
+
+
+            8.1.2 Unsupported Interrupt 21h DOS Functions
+
+
+                        AH            DESCRIPTION
+
+                       00h    Terminate Process
+                       0Fh    Open File with FCB
+                       10h    Close File with FCB
+                       14h    Sequential Read
+                       15h    Sequential Write
+                       16h    Create File with FCB
+                       21h    Random Read
+                       22h    Randon Write
+                       23h    Get File Size
+                       24h    Set Relative Record
+                       27h    Random Block Read
+                       28h    Random Block Write
+
+
+
+[Page 13]
+
+
+
+             8.2 Calls That Behave Differently in Protected Mode
+
+
+            8.2.1 Function 25h and 35h -- Set/Get Interrupt Vector
+
+                 These functions will set or get the protected mode
+                 interrupt vector. They can be used to hook hardware
+                 interrupts (such as the timer or keyboard interrupt) as
+                 well as hooking any software interrupts your program
+                 wishes to monitor. With a few exceptions, software
+                 interrupts issued in real mode will _not_ be reflected
+                 to protected mode interrupt handlers before being
+                 reflected to real mode. See page (?) for more
+                 information on hooking interrupts in protected mode
+                 programs.
+
+                 32-bit programs must use 48-bit pointers and must use
+                 the iretd instruction to return from interrupts.
+
+            8.2.2 Funtion 31h -- Terminate and Stay Resident
+
+                 The value in DX specifies the number of paragraphs of
+                 real mode memory to reserve for the program. _The_
+                 _reserved_memory_must_include_any_memory_allocated_for_
+                 _the_DOS_extender_when_the_program_switched_to_
+                 _protected_mode._ All protected mode memory allocated
+                 through Int 31h or protected mode calls to DOS function
+                 48h will not be deallocated -- It is up to the T&SR
+                 program to free any unneeded protected mode memory.
+
+                 Note that protected mode "pop-up" programs will need to
+                 be very careful when saving and restoring the current
+                 DOS state to preserve both the real mode and protected
+                 mode states of the current task. This type of program
+                 must call the state save functions documented on page
+                 (?). It must also save and restore the DTA address in
+                 _both_ protected mode and real mode. To get the current
+                 real mode DTA the program must use the translation
+                 services to call the real mode DOS Get DTA function.
+
+            8.2.3 Function 32h -- Get Current Country Data
+
+                 This call returns a 34-byte buffer that contains a
+                 dword call address at offset 12h that is used for
+                 case-mapping. This dword will contain a _real_mode_
+                 _address_. If you wish to call the case-mapping
+                 procedure you will need to use the DPMI translation
+                 service to simulate a real mode far call (see page(?)).
+
+            9.2.4 Functions 3Fh and 40h -- Read/Write File or Device
+
+                 32-bit programs must specify the size of the read or
+                 write in the ECX register instead of the CX register.
+                 This allows for read and writes of greater than 64K.
+                 Note that 16-bit programs are still limited to reads of
+                 0FFFFh bytes.
+
+
+
+[Page 14]
+
+
+
+            8.2.5 Function 44h, Subfunctions 02h, 03h, 04h, and 05h
+
+                 These IOCTL subfunctions are used to receive data from
+                 a device or send data to a device. Since it is not
+                 possible to break the transfers into small pieces, the
+                 caller should assume that a transfer of greater than 2K
+                 bytes will fail unless the address of the buffer is in
+                 the DOS addressable first megabyte.
+
+            8.2.6 Function 44h, Subfunction 0Ch
+
+                 Only minor function codes 45h (get iteration count) and
+                 65h (set iteration count) are supported from protected
+                 mode. Extensions of this IOCTL for code-page switching
+                 (functions function codes 4Ah, 4Ch, 4Dh, 6Ah, and 6Bh)
+                 are _not_ supported for protected mode programs. You
+                 must use the translation services if you need to use
+                 this IOCTL to switch code pages (see page(?)).
+
+            8.2.7 Functions 48h, 49h, 4Ah
+
+                 It is recommended that all memory allocations be made
+                 through the DPMI memory allocation services (see page
+                 (?)).
+
+                 DOS memory allocation calls issued by a protected mode
+                 program will allocate extended memory. This memory is
+                 _not_ addressable by real mode DOS.
+
+                 32-bit programs must specify the number of paragraphs
+                 to allocate in the EBX register. This allows for memory
+                 allocations of greater than 1Mb.
+
+                 To determine the size of the largest available block
+                 set (E)BX to -1 and call function 48h.
+
+            8.2.8 Function 4Bh -- Load and Execute Program
+
+                 This function can not be used to load a program overlay
+                 from a protected mode program. However, you can execute
+                 another program using subfunction 0. The program will
+                 be executed in real mode. However, the child program
+                 can enter protected mode using the DPMI real to
+                 protected mode switch API.
+
+                 The environment pointer in the exec parameter block is
+                 ignored and should be set to 0 by 16-bit programs.
+                 32-bit programs should place an fword pointer to the
+                 command tail at offset 0.
+
+
+
+[Page 15]
+
+
+
+            8.2.9 Function 4Ch -- Terminate Process with Return Code
+
+                 This is the only supported form of program termination
+                 for protected mode DOS programs. It behaves exactly as
+                 it would in real mode. It will free any memory that was
+                 allocated by the protected mode program, and return to
+                 the parent program. The protected mode Int 23h and Int
+                 24h vectors will be restored to the same value as
+
+            8.2.10 Function 65h -- Get Extended Country Information
+
+                 This function is supported for protected mode programs.
+                 However, all doubleword parameters returned will
+                 contain _real_mode_addresses_. This means the case
+                 conversion procedure address and all pointers to tables
+                 will contain real mode segment:offset addresses. You
+                 must use the translation services to call the case
+                 conversion procedure in real mode.
+
+
+
+[Page 16]
+
+
+
+                              9. SUPPORTED BIOS CALLS
+
+
+            All BIOS calls that pass parameters in the AX, BX, CX, DX,
+            SI, DI, and BP registers, and that contain no pointers or
+            segment values in these registers will be supported by all
+            implementations of DPMI (provided, of course, that the API
+            is supported by the machine's BIOS).
+
+            For the sake of clarity and completeness, this document
+            contains a list of every BIOS API that will be supported,
+            including those that are register based APIs. APIs that are
+            not register based are documented individually.
+
+
+
+[Page 17]
+
+
+
+             9.1 Interrupt 10h -- Video
+
+
+            9.1.1 Register Based Functions (supported):
+
+
+                        AH            DESCRIPTION
+
+                       00h    Set Mode
+                       01h    Set Cursor Type
+                       02h    Set Cursor Position
+                       03h    Read Cursor Position
+                       04h    Read Light Pen Position
+                       05h    Select Active Display Page
+                       06h    Scroll Active Page Up
+                       07h    Scroll Active Page Down
+                       08h    Read Attribute/Char at Cursor Position
+                       09h    Write Attribute/Char at Cursor Position
+                       0Ah    Write Character at Cursor Position
+                       0Bh    Set Color Palette
+                       0Ch    Write Dot
+                       0Dh    Read Dot
+                       0Eh    Write Teletype to Active Page
+                       0Fh    Read Current Video State
+                       1Ah    Read/Write Display Combination Code
+
+
+            9.1.2 Function 10h -- Set Palette Registers
+
+                 All subfunctions of this API are supported.
+
+            9.1.3 Function 13h -- Write String
+
+                 This call is supported provided the string is not
+                 longer than 2K bytes.
+
+            9.1.4 Functions that are not Fully Supported
+
+                 Many of these functions have APIs that are register
+                 based. All register based calls are supported. However,
+                 any APIs that contain pointer parameters are not
+                 supported under DPMI.
+
+
+                        AH            DESCRIPTION
+
+                       11h    Character Generator
+                       12h    Alternate Select
+                       14h    Load LCD Character Font
+                       15h    Return Physical Display Parameters
+                       1Bh    Return Functionality/State Info
+                       1Ch    Save/Restore Video State
+
+
+
+[Page 18]
+
+
+
+             9.2 Interrupt 11h -- Equipment Determination
+
+
+            Since interrupt 11h is register based, it will be supported
+            by all implementations of DPMI.
+
+            COMPATIBILITY WARNING:  EISA machines will destroy the high
+            word of the EAX register on machines with 80386 CPUs.
+
+
+
+[Page 19]
+
+
+
+             9.3 Interrupt 12h -- Memory Size Determination
+
+
+            Since interrupt 12h is register based, it will be supported
+            by all implementations of DPMI.
+
+
+
+[Page 20]
+
+
+
+             9.4 Interrupt 13h -- Diskette / Fixed Disk Interface
+
+
+            Application programs have no reason to use this interrupt.
+            In any case, since direct disk access will not be allowed
+            most implementations of DPMI, programs can not rely on these
+            functions.
+
+
+
+[Page 21]
+
+
+
+             9.5 Interrupt 14h -- Asynchronous Communications
+
+
+            Since all asynchronous communication APIs are register
+            based, they are all supported.
+
+
+                        AH            DESCRIPTION
+
+                       00h    Initialize Communications Port
+                       01h    Send Character
+                       02h    Receive Character
+                       03h    Read Status
+                       04h    Extended Initialize
+                       05h    Extended Communications Port Control
+
+
+
+[Page 22]
+
+
+
+             9.6 Interrupt 15h -- System Services
+
+
+            9.6.1 Register Based Functions (supported):
+
+
+                        AH            DESCRIPTION
+
+                       00h    Turn Cassette Motor On
+                       01h    Turn Cassette Motor Off
+                       40h    Read/Modify Profiles
+                       42h    Request System Power-Off
+                       43h    Read System Status
+                       44h    Activate/Deactivate Internal Modem
+                       80h    Device Open
+                       81h    Device Close
+                       82h    Program Termination
+                       84h    Joystick Support
+                       86h    Wait
+                       87h    Extended Memory Size
+                       C3h    Enable/Disable Watchdog Time-Out
+                       C4h    Porgrammable Option Select (POS)
+
+
+            9.6.2 Function C0h -- Return System Configuration Parameters
+
+                 This call is supported. The pointer to the system
+                 descriptor vector will be in ES:EBX for 32-bit
+                 programs.
+
+            9.6.3 Function C1h -- Pointing Device Interface
+
+                 This interface will _not_ be supported under most
+                 implementations of DPMI. Programs that use a mouse are
+                 encouraged to use the Int 33h interface documented on
+                 page 26.
+
+            9.6.4 Functions that are _Not_ Supported:
+
+
+                        AH            DESCRIPTION
+
+                       02h    Read Blocks from Cassette
+                       03h    Write Blocks to Cassette
+                       0Fh    Format Unit Periodic Interrupt
+                       21h    Power-On Self-Test Error Log
+                       41h    Wait for External Event
+                       4Fh    Keyboard Intercept
+                       83h    Wait Event
+                       85h    System Request Key Pressed
+                       87h    Move Block
+                       89h    Switch Processor to Protected Mode
+                       90h    Device Busy
+                       91h    Interrupt Complete
+                       C1h    Return Extended BIOS Data Area Seg
+
+
+
+[Page 23]
+
+
+
+             9.7 Interrupt 16h -- Keyboard
+
+
+            Since all keyboard APIs are register based, they are all
+            supported.
+
+
+                        AH            DESCRIPTION
+
+                       00h    Keyboard Read
+                       01h    Keyboard Status
+                       02h    Shift Status
+                       03h    Set Typematic Rate
+                       04h    Keyboard Click Adjustment
+                       05h    Keyboard Write
+                       10h    Extended Keyboard Read
+                       11h    Extended Keyboard Status
+                       12h    Extended Shift Status
+
+
+
+[Page 24]
+
+
+
+             9.8 Interrupt 17h -- Printer
+
+
+            Since all printer APIs are register based, they are all
+            supported.
+
+
+                        AH            DESCRIPTION
+
+                       00h    Print Character
+                       01h    Initialize the Printer
+                       02h    Read Status
+
+
+
+[Page 25]
+
+
+
+             9.9 Interrupt 1Ah -- System-Timer and Real-Time Clock
+
+
+            9.9.1 Register Based Functions (supported):
+
+
+                        AH            DESCRIPTION
+
+                       00h    Read System-Timer Time Counter
+                       01h    Set System-Timer Time Counter
+                       02h    Read Real-Time Clock Time
+                       03h    Set Real-Time Clock Time
+                       04h    Read Real-Time Clock Date
+                       05h    Set Real-Time Clock Date
+                       07h    Set Real-Time Clock Alarm
+                       08h    Set Real-Time Clock Activated Power On
+                       09h    Read Real-Time Clock Alarm Status
+                       0Ah    Read System-Timer Day Counter
+                       0Bh    Set System-Timer Day Counter
+
+
+            9.9.2 Function 06h -- Set Real-Time Clock Alarm
+
+                 Although this call is register based and therefore
+                 requires no translation before being passed to real
+                 mode, the caller is required to hook the _real_mode_
+                 interrupt 4Ah vector to intercept the alarm interrupt.
+
+
+
+[Page 26]
+
+
+
+                             10. MOUSE DRIVER INTERFACE
+
+
+            DPMI supports a subset of the standard Int 33h mouse driver
+            interface for protected mode programs. It may be necessary
+            for programs to call the mouse driver in real mode either
+            before switching to protected mode or by using the
+            translation services to completely save and restore the
+            mouse driver state.
+
+
+             10.1 Mouse Calls that Are Supported
+
+
+            10.1.1 Register Based Calls
+
+
+                        AH            DESCRIPTION
+
+                       00h    Reset Mouse and Get Status
+                       01h    Show Mouse Pointer
+                       02h    Hide Mouse Pointer
+                       03h    Get Mouse Position and Button Status
+                       04h    Set Mouse Pointer Position
+                       05h    Get Button Press Information
+                       06h    Get Button Release Information
+                       07h    Set Horizontal Limits for Pointer
+                       08h    Set Vertical Limits for Pointer
+                       0Ah    Set Text Pointer Type
+                       0Bh    Read Mouse Motion Counters
+                       0Dh    Turn On Light Pen Emulation
+                       0Eh    Turn Off Light Pen Emulation
+                       0Fh    Set Mickeys to Pixels Ratio
+                       10h    Set Mouse Pointer Exclusion Area
+                       13h    Set Double Speed Threshold
+                       15h    Get Mouse Save State Buffer Size
+                       1Ah    Set Mouse Sensitivity
+                       1Bh    Get Mouse Sensitivity
+                       1Ch    Set Mouse Interrupt Rate
+                       1Dh    Select Pointer Page
+                       1Eh    Get Pointer Page
+                       20h    Enable Mouse
+                       21h    Reset Mouse Driver
+                       22h    Set Language for Mouse Driver
+                       23h    Get Language Number
+                       24h    Get Mouse Information
+
+
+            10.1.2 Function 09h -- Set Pointer Shape
+
+                  This call works exactly as it would in real mode.
+                  However, 32-bit programs must use ES:EDX to point to
+                  the pointer image buffer.
+
+
+
+[Page 27]
+
+
+
+            10.1.3 Function 0Ch -- Set User-Defined Mouse Event Handler
+
+                  32-bit programs must call this function with ES:EDX =
+                  Selector:Offset of the handler and will need to
+                  execute a 32-bit far return to return from the event
+                  call-back. For both 16-bit and 32-bit programs the
+                  protected mode DS will _not_ point to the mouse driver
+                  data segment when the event handler is called. Do not
+                  rely on any specific value in the DS register when the
+                  event handler is called.
+
+            10.1.4 Functions 16h and 17h -- Save/Restore Mouse Driver State
+
+                  These calls work exactly as they would in real mode.
+                  However, 32-bit programs must use ES:EDX to point to
+                  the buffer.
+
+
+             10.2 Mouse Calls that Are Not Supported
+
+
+                        AH            DESCRIPTION
+
+                       14h    Swap User-Defined Event Handlers
+                       18h    Set Alternate Event Handler
+                       19h    Get Address of Alternate Event Handler
+                       1Fh    Disable Mouse Driver
+
+
+
+[Page 28]
+
+
+
+                                    11. NETBIOS
+
+
+            Some implementations of DPMI support NetBIOS calls in
+            protected mode, although this is not required. Programs can
+            determine wether [sic] or not the current DPMI
+            implementation supports NetBIOS calls from protected mode by
+            examining the flags returned from the Get Version call (see
+            page (?)). A program that uses NetBIOS and needs to run on
+            any DPMI implementation will need to use the translation
+            services documented on page (?).
+
+            32-bit programs can call NetBIOS if it is supported. In this
+            case, ES:EBX must be used to point to the Network Control
+            Block (NCB). However, pointers within the NCB are restricted
+            to a 16-bit offset. Therefore, all buffers must reside
+            within the first 64K of the buffer's segment.
+
+
+
+[Page 29]
+
+
+
+                             12. INTERRUPTS 23H AND 24H
+
+
+            DOS provides two interrupts that programs can hook to handle
+            Ctrl+Break and critical device errors. These interrupts are
+            reflected to protected mode programs if the program hooks
+            the interrupt in protected mode. Although both of these
+            interrupts can be used to terminate a program in real mode,
+            they can not be used to terminate protected mode programs.
+
+            Protected mode Int 23h and Int 24h handlers must reside in
+            locked memory and all data that they touch must also be
+            locked. This is required to prevent a page fault from
+            occurring at a time when DOS can not be called to read the
+            data in from disk. These interrupt handlers will always be
+            called on a locked stack.
+
+
+            12.1.1 Interrupt 23h
+
+            Interrupt 23h is the DOS Ctrl+Break interrupt. This
+            interrupt will be reflected to protected mode if a protected
+            mode interrupt handler is installed. Unlike real mode DOS,
+            the interrupt handler _must_return_. This interrupt can not
+            be used to terminate a protected mode program and the value
+            of the carry flag will be ignored when the interrupt
+            returns.It is suggested that you set a flag in your program
+            that will be examined later and then execute an iret to
+            return from the interrupt.
+
+            Int 23h is ignored for protected mode programs unless it is
+            hooked in protected mode.
+
+
+            12.1.2 Interrupt 24h
+
+            When Int 24h is called in protected mode, SS:(E)BP will
+            point to a standard Int 24h stack frame. 32-bit programs
+            will be called with a 32-bit iret frame but the rest of the
+            stack frame will be exactly as that of a 16-bit Int 24h. The
+            values on the stack will contain the values passed to DOS in
+            _real_mode_. Therefore, the segment register values on the
+            stack will be real mode segments, not selectors.
+
+            Protected mode Int 24h handlers _must_iret_. Since programs
+            can not be terminated by a critical error handler, an
+            attempt to abort the program (returning with AL=02h) will be
+            ignored and the DOS call will be failed.
+
+            The default Int 24h handler will fail all critical errors.
+            Therefore, unless the protected mode Int 24h vector is
+            hooked, all DOS calls that generate a critical error will
+            fail.
+
+
+
+[Page 30]
+
+
+
+               13. ADDITIONAL HOST SUPPORT REQUIRED TO RUN MICROSOFT
+                             WINDOWS IN PROTECTED MODE
+
+
+             13.1 Direct Disk I/O
+
+            Windows Enhanced and Standard mode support interrupts 25h,
+            26h, and a subset of Int 13h diskette functions so that the
+            File Manager can format diskettes. Application programs have
+            no reason to use either of these interrupts. DPMI hosts must
+            support these functions if they wish allow diskettes to be
+            formatted using the Windows file manager. In any case, if
+            these functions are not supported then appropriate error
+            codes should be returned when these APIs are called.
+
+            Windows supports a subset of the diskette functions that are
+            used by the File Manager to format diskettes.
